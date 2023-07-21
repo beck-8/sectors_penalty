@@ -13,13 +13,13 @@ make build
 ./sectors_penalty -port 6666
 
 # use other lotus rpc
-export LOTUS_RPC="https://api.node.glif.io/rpc/v0"
+export FULLNODE_RPC="https://api.node.glif.io/rpc/v0"
 ./sectors_penalty
 ```
 ## Usage
-> miner 节点ID
-all 是否展示全部的扇区（包含过期的）
-offset 往前/往后推移多少天（+20/-20）
+> miner 节点ID  
+all 是否展示全部的扇区（包含过期的）  
+offset 往前/往后推移多少天（+20/-20）  
 #### 查看f01155的信息  
 ```
 http://127.0.0.1:8099/penalty?miner=f01155
