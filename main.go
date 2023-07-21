@@ -22,7 +22,6 @@ func main() {
 	flag.StringVar(&port, "port", ":8099", "Specify a port")
 	flag.Parse()
 
-	// // 在这里使用 name 变量，即为从命令行获取的参数值
 	r := gin.Default()
 	// 使用查询参数解析 URL 参数
 	r.GET("/penalty", func(c *gin.Context) {
@@ -106,10 +105,10 @@ func Compute(mid address.Address, allSectors bool, offset abi.ChainEpoch) (strin
 	sumData := make(map[string]*daliyData, 540)
 	for _, info := range onChainInfo {
 		date := heightToTime(int64(info.Expiration))
-		live := tsk.Height() + offset - info.Activation
+		live := (tsk.Height() + offset - info.Activation) / 2880
 
 		var penalty abi.TokenAmount
-		if live/2880 >= 140 {
+		if live >= 140 {
 			penalty = big.Add(info.ExpectedStoragePledge, big.Mul(info.ExpectedDayReward, big.NewInt(int64(70))))
 		} else {
 			penalty = big.Add(info.ExpectedStoragePledge, big.Mul(info.ExpectedDayReward, big.NewInt(int64(live/2))))
