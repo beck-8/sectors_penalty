@@ -29,10 +29,12 @@ func main() {
 		miner := c.Query("miner")
 		if miner == "" {
 			c.String(400, "please specify a miner")
+			return
 		}
 		mid, err := address.NewFromString(miner)
 		if err != nil {
 			c.String(400, err.Error())
+			return
 		}
 
 		allSectors, _ := strconv.ParseBool(c.DefaultQuery("all", "0"))
@@ -44,6 +46,7 @@ func main() {
 		if err != nil {
 			log.Printf("%v\n", err)
 			c.String(500, "Internal Server Error")
+			return
 		}
 		c.String(200, data)
 
