@@ -1,5 +1,6 @@
 # sectors_penalty
-获取节点扇区过期时间、过期扇区数量、到期释放质押币、此时终结惩罚（扇区在请求数据时进行终结，要惩罚的费用）
+- 获取节点扇区过期时间、过期扇区数量、到期释放质押币、此时终结惩罚（扇区在请求数据时进行终结，要惩罚的费用）
+- 获取节点的锁仓释放明细
 ## install && run
 > 返回慢时，优化此程序到lotus rpc之间的链接
 ```bash
@@ -12,8 +13,9 @@ make build
 # use port 6666
 ./sectors_penalty -port 6666
 
-# use other lotus rpc
-export FULLNODE_RPC="http://192.168.1.1:1234/rpc/v1"
+# use other lotus
+# lotus auth api-info --perm read
+export FULLNODE_API_INFO=/ip4/192.168.1.1/tcp/1234/http
 ./sectors_penalty
 ```
 ## Usage
@@ -31,6 +33,10 @@ http://127.0.0.1:8099/penalty?miner=f01155&all=1
 #### 查看f01155 20天后的终结惩罚信息（penalty列数据不变说明已经达到惩罚上限）
 ```
 http://127.0.0.1:8099/penalty?miner=f01155&offset=20
+```
+#### 查看f01155 锁仓释放明细
+```
+http://127.0.0.1:8099/vested?miner=f01155
 ```
 
 ## example
@@ -76,3 +82,13 @@ date,mid,sectors_sum,power(TiB),pledge,penalty
 - 如果想看此节点20天之后全部终结的惩罚，使用 `curl http://127.0.0.1:8099/penalty?miner=f0866680&offset=20`
 - 如果想看此节点20天之前全部终结的惩罚，使用 `curl http://127.0.0.1:8099/penalty?miner=f0866680&offset=-20`
 - 如果要对数据进行二次处理加工，复制数据保存为csv打开或者使用excel按逗号分列或者awk等等
+
+`curl http://127.0.0.1:8099/vested?miner=f0866680`
+```
+Date,VestedFunds(FIL)
+2023-07-27,0.0000000000
+2023-07-28,1.0712193049
+...
+2024-01-21,0.1849083665
+2024-01-22,0.0457635234
+```
