@@ -22,9 +22,12 @@ export FULLNODE_API_INFO=/ip4/192.168.1.1/tcp/1234/http
 > miner 节点ID  
 all 是否展示全部的扇区（包含过期的）  
 offset 往前/往后推移多少天（+20/-20）  
+json 返回json格式数据
 #### 查看f01155的信息  
 ```
 http://127.0.0.1:8099/penalty?miner=f01155
+
+http://127.0.0.1:8099/penalty?miner=f01155&json=1
 ```
 #### 查看f01155全部的信息（包含已经过期的）
 ```
@@ -37,6 +40,8 @@ http://127.0.0.1:8099/penalty?miner=f01155&offset=20
 #### 查看f01155 锁仓释放明细
 ```
 http://127.0.0.1:8099/vested?miner=f01155
+
+http://127.0.0.1:8099/vested?miner=f01155&json=1
 ```
 
 ## example
@@ -91,4 +96,48 @@ Date,VestedFunds(FIL)
 ...
 2024-01-21,0.1849083665
 2024-01-22,0.0457635234
+```
+`curl http://127.0.0.1:8099/penalty?miner=f010202&json=1`
+```
+{
+    "code": 200,
+    "level": 0,
+    "msg": "OK",
+    "data": [
+        {
+            "date": "2023-09-25",
+            "mid": "f010202",
+            "sectors_sum": 1,
+            "power": 0.03125,
+            "pledge": "0.1885872137",
+            "penalty": "0.0578863373"
+        },
+        {
+            "date": "2025-02-13",
+            "mid": "f010202",
+            "sectors_sum": 1,
+            "power": 0.03125,
+            "pledge": "0.1916776235",
+            "penalty": "0.0045002204"
+        }
+    ]
+}
+```
+`curl http://127.0.0.1:8099/vested?miner=f010202&json=1`
+```
+{
+    "code": 200,
+    "level": 0,
+    "msg": "OK",
+    "data": [
+        {
+            "date": "2023-08-26",
+            "vested_funds": "1.4587645221"
+        },
+        {
+            "date": "2024-02-20",
+            "vested_funds": "0.0659376734"
+        }
+    ]
+}
 ```

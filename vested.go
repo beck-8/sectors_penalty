@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	b "math/big"
+	"net/http"
+	"strconv"
 
 	"time"
 
@@ -20,24 +22,43 @@ func vestedFunds(c *gin.Context) {
 	// 获取查询参数值
 	miner := c.Query("miner")
 	if miner == "" {
-		c.String(400, "please specify a miner")
+		c.JSON(http.StatusBadRequest, APIResponse{
+			Code: http.StatusBadRequest,
+			Msg:  "please specify a miner",
+		})
+		return
 	}
 	mid, err := address.NewFromString(miner)
 	if err != nil {
-		c.String(400, err.Error())
+		c.JSON(http.StatusBadRequest, APIResponse{
+			Code: http.StatusBadRequest,
+			Msg:  err.Error(),
+		})
 	}
+	jsonOut, _ := strconv.ParseBool(c.DefaultQuery("json", "0"))
 
-	data, err := getVested(mid)
+	data, err := getVested(mid, jsonOut)
 	if err != nil {
-		c.String(500, err.Error())
+		c.JSON(http.StatusInternalServerError, APIResponse{
+			Code: http.StatusInternalServerError,
+			Msg:  err.Error(),
+		})
 		return
 	}
 
-	c.String(200, data)
+	if jsonOut {
+		c.JSON(http.StatusOK, APIResponse{
+			Code: http.StatusOK,
+			Msg:  "OK",
+			Data: data,
+		})
+	} else {
+		c.String(200, data.(string))
+	}
 
 }
 
-func getVested(mid address.Address) (string, error) {
+func getVested(mid address.Address, jsonOut bool) (interface{}, error) {
 	mact, err := lapi.StateGetActor(ctx, mid, types.EmptyTSK)
 	if err != nil {
 		return "", err
@@ -52,6 +73,11 @@ func getVested(mid address.Address) (string, error) {
 		return "", err
 	}
 
+	type dayData struct {
+		Date        string `json:"date"`
+		VestedFunds string `json:"vested_funds"`
+	}
+	dayDatas := make([]*dayData, 0)
 	var data string
 	data += fmt.Sprintln("Date,VestedFunds(FIL)")
 
@@ -69,9 +95,16 @@ func getVested(mid address.Address) (string, error) {
 		oldVested = vested
 
 		lockedFund.VestingFunds = big.Sub(lockedFund.VestingFunds, dayVested)
-		data += fmt.Sprintf("%v,%v\n", heightToTime(int64(startEpoch-1)), new(b.Rat).SetFrac(dayVested.Int, b.NewInt(1e18)).FloatString(10))
+		structData := &dayData{
+			Date:        heightToTime(int64(startEpoch - 1)),
+			VestedFunds: new(b.Rat).SetFrac(dayVested.Int, b.NewInt(1e18)).FloatString(10),
+		}
+		dayDatas = append(dayDatas, structData)
+		data += fmt.Sprintf("%v,%v\n", structData.Date, structData.VestedFunds)
 	}
-
+	if jsonOut {
+		return dayDatas, nil
+	}
 	return data, nil
 }
 
