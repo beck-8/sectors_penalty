@@ -124,7 +124,7 @@ func Compute(mid address.Address, allSectors bool, offset abi.ChainEpoch, jsonOu
 
 	sumData := make(map[string]*daliyData, 540)
 	for _, info := range onChainInfo {
-		date := heightToTime(int64(info.Expiration))
+		date := heightToTime(int64(info.Expiration) + int64(deadlines[uint64(info.SectorNumber)]*60))
 		live := (tsk.Height() + offset - info.Activation) / 2880
 
 		var penalty abi.TokenAmount
