@@ -148,7 +148,7 @@ func Compute(mid address.Address, allSectors bool, offset abi.ChainEpoch, jsonOu
 		expected_reward = big.Add(expected_reward, big.Mul(info.ReplacedDayReward, big.NewInt(relevant_replaced_age)))
 		expected_reward = big.Div(expected_reward, big.NewInt(2))
 
-		penalty = big.Add(expected_reward, info.ExpectedStoragePledge)
+		penalty = big.Add(info.ExpectedStoragePledge, big.Div(expected_reward, big.NewInt(2880)) )
 
 		if data, ok := sumData[date]; ok {
 			data.info[uint64(info.SectorNumber)] = info.InitialPledge
