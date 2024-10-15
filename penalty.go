@@ -125,14 +125,30 @@ func Compute(mid address.Address, allSectors bool, offset abi.ChainEpoch, jsonOu
 	sumData := make(map[string]*daliyData, 540)
 	for _, info := range onChainInfo {
 		date := heightToTime(int64(info.Expiration) + int64(deadlines[uint64(info.SectorNumber)]*60))
-		live := (tsk.Height() + offset - info.Activation) / 2880
 
 		var penalty abi.TokenAmount
-		if live >= 140 {
-			penalty = big.Add(info.ExpectedStoragePledge, big.Mul(info.ExpectedDayReward, big.NewInt(int64(70))))
+
+		// https://github.com/filecoin-project/builtin-actors/blob/54236ae89880bf4aa89b0dba6d9060c3fd2aacee/actors/miner/src/monies.rs#L202
+		// ctrl c ctrl v 的，所以没有遵循golang的命名规范
+		lifetime_cap := int64(140 * 2880)
+		var capped_sector_age int64
+		if sector_age := int64(tsk.Height()) - int64(info.PowerBaseEpoch); lifetime_cap < sector_age {
+			capped_sector_age = lifetime_cap
 		} else {
-			penalty = big.Add(info.ExpectedStoragePledge, big.Mul(info.ExpectedDayReward, big.NewInt(int64(live/2))))
+			capped_sector_age = sector_age
 		}
+		expected_reward := big.Mul(info.ExpectedDayReward, big.NewInt(capped_sector_age))
+
+		var relevant_replaced_age int64
+		if replaced_sector_age := int64(info.PowerBaseEpoch) - int64(info.Activation); replaced_sector_age < lifetime_cap-capped_sector_age {
+			relevant_replaced_age = replaced_sector_age
+		} else {
+			relevant_replaced_age = lifetime_cap - capped_sector_age
+		}
+		expected_reward = big.Add(expected_reward, big.Mul(info.ReplacedDayReward, big.NewInt(relevant_replaced_age)))
+		expected_reward = big.Div(expected_reward, big.NewInt(2))
+
+		penalty = big.Add(expected_reward, info.ExpectedStoragePledge)
 
 		if data, ok := sumData[date]; ok {
 			data.info[uint64(info.SectorNumber)] = info.InitialPledge
