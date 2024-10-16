@@ -132,7 +132,7 @@ func Compute(mid address.Address, allSectors bool, offset abi.ChainEpoch, jsonOu
 		// ctrl c ctrl v 的，所以没有遵循golang的命名规范
 		lifetime_cap := int64(140 * 2880)
 		var capped_sector_age int64
-		if sector_age := int64(tsk.Height()) - int64(info.PowerBaseEpoch); lifetime_cap < sector_age {
+		if sector_age := int64(tsk.Height()+offset) - int64(info.PowerBaseEpoch); lifetime_cap < sector_age {
 			capped_sector_age = lifetime_cap
 		} else {
 			capped_sector_age = sector_age
@@ -148,7 +148,7 @@ func Compute(mid address.Address, allSectors bool, offset abi.ChainEpoch, jsonOu
 		expected_reward = big.Add(expected_reward, big.Mul(info.ReplacedDayReward, big.NewInt(relevant_replaced_age)))
 		expected_reward = big.Div(expected_reward, big.NewInt(2))
 
-		penalty = big.Add(info.ExpectedStoragePledge, big.Div(expected_reward, big.NewInt(2880)) )
+		penalty = big.Add(info.ExpectedStoragePledge, big.Div(expected_reward, big.NewInt(2880)))
 
 		if data, ok := sumData[date]; ok {
 			data.info[uint64(info.SectorNumber)] = info.InitialPledge
