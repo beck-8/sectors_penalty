@@ -34,6 +34,7 @@ func vestedFunds(c *gin.Context) {
 			Code: http.StatusBadRequest,
 			Msg:  err.Error(),
 		})
+		return
 	}
 	jsonOut, _ := strconv.ParseBool(c.DefaultQuery("json", "0"))
 
