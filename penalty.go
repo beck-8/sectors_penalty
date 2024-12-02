@@ -88,6 +88,7 @@ func Compute(mid address.Address, allSectors bool, offset abi.ChainEpoch, jsonOu
 		return "", err
 	}
 
+	liveSectors := make(map[uint64]bool)
 	deadlines := make(map[uint64]int)
 	for i := 0; i < 48; i++ {
 		partitions, err := lapi.StateMinerPartitions(ctx, mid, uint64(i), types.EmptyTSK)
@@ -106,6 +107,18 @@ func Compute(mid address.Address, allSectors bool, offset abi.ChainEpoch, jsonOu
 			for _, sec := range sectors {
 				deadlines[sec] = i
 			}
+
+			liveCount, err := part.LiveSectors.Count()
+			if err != nil {
+				return "", err
+			}
+			liveSector, err := part.LiveSectors.AllMap(liveCount)
+			if err != nil {
+				return "", err
+			}
+			for k, v := range liveSector {
+				liveSectors[k] = v
+			}
 		}
 	}
 
@@ -116,9 +129,14 @@ func Compute(mid address.Address, allSectors bool, offset abi.ChainEpoch, jsonOu
 			return "", err
 		}
 	} else {
-		onChainInfo, err = lapi.StateMinerSectors(ctx, mid, nil, types.EmptyTSK)
+		tmp, err := lapi.StateMinerSectors(ctx, mid, nil, types.EmptyTSK)
 		if err != nil {
 			return "", err
+		}
+		for _, v := range tmp {
+			if liveSectors[uint64(v.SectorNumber)] {
+				onChainInfo = append(onChainInfo, v)
+			}
 		}
 	}
 
