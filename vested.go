@@ -36,9 +36,19 @@ func vestedFunds(c *gin.Context) {
 		})
 		return
 	}
+	// 往后/往前 推多少天,只能负数
+	offset, _ := strconv.ParseInt(c.DefaultQuery("offset", "0"), 10, 64)
+	if offset > 0 {
+		c.JSON(http.StatusInternalServerError, APIResponse{
+			Code: http.StatusInternalServerError,
+			Msg:  "offset can only be negative",
+		})
+		return
+	}
+
 	jsonOut, _ := strconv.ParseBool(c.DefaultQuery("json", "0"))
 
-	data, err := getVested(mid, jsonOut)
+	data, err := getVested(mid, abi.ChainEpoch(offset*2880), jsonOut)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, APIResponse{
 			Code: http.StatusInternalServerError,
@@ -59,8 +69,14 @@ func vestedFunds(c *gin.Context) {
 
 }
 
-func getVested(mid address.Address, jsonOut bool) (interface{}, error) {
-	mact, err := lapi.StateGetActor(ctx, mid, types.EmptyTSK)
+func getVested(mid address.Address, offset abi.ChainEpoch, jsonOut bool) (interface{}, error) {
+	startEpoch := getTodayHeight() + offset
+
+	ts, err := lapi.ChainGetTipSetByHeight(ctx, startEpoch, types.EmptyTSK)
+	if err != nil {
+		return "", err
+	}
+	mact, err := lapi.StateGetActor(ctx, mid, ts.Key())
 	if err != nil {
 		return "", err
 	}
@@ -82,7 +98,6 @@ func getVested(mid address.Address, jsonOut bool) (interface{}, error) {
 	var data string
 	data += fmt.Sprintln("Date,VestedFunds(FIL)")
 
-	startEpoch := getTodayHeight()
 	oldVested := abi.NewTokenAmount(0)
 	for lockedFund.VestingFunds.GreaterThan(big.NewInt(0)) {
 		// 从明天0点高度开始
