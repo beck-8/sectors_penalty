@@ -93,10 +93,11 @@ func getVested(mid address.Address, offset abi.ChainEpoch, jsonOut bool) (interf
 	type dayData struct {
 		Date        string `json:"date"`
 		VestedFunds string `json:"vested_funds"`
+		Miner       string `json:"miner"`
 	}
 	dayDatas := make([]*dayData, 0)
 	var data string
-	data += fmt.Sprintln("Date,VestedFunds(FIL)")
+	data += fmt.Sprintln("Date,Miner,VestedFunds(FIL)")
 
 	oldVested := abi.NewTokenAmount(0)
 	for lockedFund.VestingFunds.GreaterThan(big.NewInt(0)) {
@@ -114,9 +115,10 @@ func getVested(mid address.Address, offset abi.ChainEpoch, jsonOut bool) (interf
 		structData := &dayData{
 			Date:        heightToTime(int64(startEpoch - 1)),
 			VestedFunds: new(b.Rat).SetFrac(dayVested.Int, b.NewInt(1e18)).FloatString(10),
+			Miner:       mid.String(),
 		}
 		dayDatas = append(dayDatas, structData)
-		data += fmt.Sprintf("%v,%v\n", structData.Date, structData.VestedFunds)
+		data += fmt.Sprintf("%v,%v,%v\n", structData.Date, structData.Miner, structData.VestedFunds)
 	}
 	if jsonOut {
 		return dayDatas, nil
