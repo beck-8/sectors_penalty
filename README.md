@@ -19,7 +19,9 @@ export FULLNODE_API_INFO=/ip4/192.168.1.1/tcp/1234/http
 ./sectors_penalty
 
 # 使用自定义的日期格式
+# 数字必须一摸一样，这是规范
 export DATE_FORMAT="2006-01-02"
+export DATE_FORMAT="2006-01-02 15:04:05"
 ```
 ## Usage
 > miner 节点ID  
