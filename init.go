@@ -17,6 +17,8 @@ var ctx = context.Background()
 
 var bootstrapTime = int64(1598306400)
 
+var dateFormat = "2006-01-02"
+
 func init() {
 
 	if api := os.Getenv("FULLNODE_API_INFO"); api == "" {
@@ -24,6 +26,9 @@ func init() {
 		if err != nil {
 			log.Panicln(err)
 		}
+	}
+	if e := os.Getenv("DATE_FORMAT"); e != "" {
+		dateFormat = e
 	}
 
 	var err error

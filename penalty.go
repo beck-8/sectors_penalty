@@ -12,6 +12,7 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
+	m "github.com/filecoin-project/go-state-types/builtin/v15/miner"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/miner"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/gin-gonic/gin"
@@ -88,6 +89,10 @@ func Compute(mid address.Address, allSectors bool, offset abi.ChainEpoch, jsonOu
 		return "", err
 	}
 
+	cd, err := lapi.StateMinerProvingDeadline(ctx, mid, tsk.Key())
+	if err != nil {
+		return "", err
+	}
 	liveSectors := make(map[uint64]bool)
 	deadlines := make(map[uint64]int)
 	for i := 0; i < 48; i++ {
@@ -142,7 +147,9 @@ func Compute(mid address.Address, allSectors bool, offset abi.ChainEpoch, jsonOu
 
 	sumData := make(map[string]*daliyData, 540)
 	for _, info := range onChainInfo {
-		date := heightToTime(int64(info.Expiration) + int64(deadlines[uint64(info.SectorNumber)]*60))
+		// date := heightToTime(int64(info.Expiration) + int64(deadlines[uint64(info.SectorNumber)]*60))
+		// 上述已丢弃，弃用，应该是nv15丢弃的
+		date := heightToTime(int64(m.QuantSpecForDeadline(m.NewDeadlineInfo(cd.PeriodStart, uint64(deadlines[uint64(info.SectorNumber)]), 0)).QuantizeUp(info.Expiration)))
 
 		var penalty abi.TokenAmount
 
@@ -244,6 +251,6 @@ func heightToTime(height int64) string {
 	// 使用 time.Unix() 将时间戳转换为日期
 	dateTime := time.Unix(timestamp, 0)
 	// 将日期转换为指定格式的字符串
-	dateString := dateTime.Format("2006-01-02")
+	dateString := dateTime.Format(dateFormat)
 	return dateString
 }

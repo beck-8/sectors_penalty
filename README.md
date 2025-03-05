@@ -17,6 +17,9 @@ make
 # lotus auth api-info --perm read
 export FULLNODE_API_INFO=/ip4/192.168.1.1/tcp/1234/http
 ./sectors_penalty
+
+# 使用自定义的日期格式
+export DATE_FORMAT="2006-01-02"
 ```
 ## Usage
 > miner 节点ID  
