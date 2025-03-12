@@ -128,8 +128,8 @@ func Compute(mid address.Address, allSectors bool, offset abi.ChainEpoch, jsonOu
 	}
 
 	var onChainInfo []*miner.SectorOnChainInfo
-	if !allSectors {
-		onChainInfo, err = lapi.StateMinerActiveSectors(ctx, mid, types.EmptyTSK)
+	if allSectors {
+		onChainInfo, err = lapi.StateMinerSectors(ctx, mid, nil, types.EmptyTSK)
 		if err != nil {
 			return "", err
 		}
