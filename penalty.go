@@ -74,7 +74,7 @@ func penalty(c *gin.Context) {
 
 func Compute(mid address.Address, allSectors bool, offset abi.ChainEpoch, jsonOut bool) (interface{}, error) {
 
-	type daliyData struct {
+	type dailyData struct {
 		penalty abi.TokenAmount
 		info    map[uint64]abi.TokenAmount
 	}
@@ -93,6 +93,7 @@ func Compute(mid address.Address, allSectors bool, offset abi.ChainEpoch, jsonOu
 	if err != nil {
 		return "", err
 	}
+	//todo: pre-allocation
 	liveSectors := make(map[uint64]bool)
 	deadlines := make(map[uint64]int)
 	for i := 0; i < 48; i++ {
@@ -145,7 +146,7 @@ func Compute(mid address.Address, allSectors bool, offset abi.ChainEpoch, jsonOu
 		}
 	}
 
-	sumData := make(map[string]*daliyData, 540)
+	sumData := make(map[string]*dailyData, 540)
 	for _, info := range onChainInfo {
 		// date := heightToTime(int64(info.Expiration) + int64(deadlines[uint64(info.SectorNumber)]*60))
 		// 上述已丢弃，弃用，应该是nv15丢弃的
@@ -162,6 +163,9 @@ func Compute(mid address.Address, allSectors bool, offset abi.ChainEpoch, jsonOu
 		} else {
 			capped_sector_age = sector_age
 		}
+		if capped_sector_age < 0 {
+			capped_sector_age = 0
+		}
 		expected_reward := big.Mul(info.ExpectedDayReward, big.NewInt(capped_sector_age))
 
 		var relevant_replaced_age int64
@@ -175,11 +179,18 @@ func Compute(mid address.Address, allSectors bool, offset abi.ChainEpoch, jsonOu
 
 		penalty = big.Add(info.ExpectedStoragePledge, big.Div(expected_reward, big.NewInt(2880)))
 
+		// 说明用户把offset设置了很大的负数，这个时候罚金就是ExpectedStoragePledge
+		// 这样处理后，t = tsk.Height()+offset，t在上次续期时间之后是准确的；t在扇区激活-上次续期时间之间是不太准确的；t在扇区激活之前是准确的。
+		// |----|--bad--|----|
+		if tsk.Height()+offset < info.Activation {
+			penalty = info.ExpectedStoragePledge
+		}
+
 		if data, ok := sumData[date]; ok {
 			data.info[uint64(info.SectorNumber)] = info.InitialPledge
 			data.penalty = big.Add(data.penalty, penalty)
 		} else {
-			sumData[date] = &daliyData{penalty: penalty, info: make(map[uint64]abi.TokenAmount)}
+			sumData[date] = &dailyData{penalty: penalty, info: make(map[uint64]abi.TokenAmount)}
 
 			sumData[date].info[uint64(info.SectorNumber)] = info.InitialPledge
 
