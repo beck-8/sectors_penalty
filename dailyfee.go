@@ -76,8 +76,16 @@ func computeDailyFee(jsonOut bool) (interface{}, error) {
 		return d, nil
 	}
 
+	head, err := lapi.ChainHead(ctx)
+	if err != nil {
+		return nil, err
+	}
 	// Create buffer and table writer
 	buf := new(bytes.Buffer)
+	buf.WriteString(fmt.Sprintf("Chain Height: %d\n", head.Height()))
+	buf.WriteString(fmt.Sprintf("Chain Timestamp: %d\n", head.MinTimestamp()))
+	buf.WriteString(fmt.Sprintf("FilCirculating: %s FIL\n", big.NewInt(0).Div(circulatingSupply.FilCirculating.Int, big.NewInt(1e18))))
+
 	table := tablewriter.NewWriter(buf)
 	// Set table title
 	table.SetCaption(false, "Daily Fee Details")
