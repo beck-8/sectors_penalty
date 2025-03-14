@@ -9,6 +9,7 @@ require (
 	github.com/filecoin-project/go-state-types v0.15.0
 	github.com/filecoin-project/lotus v1.30.0
 	github.com/gin-gonic/gin v1.9.1
+	github.com/olekukonko/tablewriter v0.0.5
 	github.com/urfave/cli/v2 v2.25.5
 )
 

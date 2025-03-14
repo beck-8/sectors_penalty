@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"log"
 	"os"
 
@@ -20,6 +21,8 @@ var bootstrapTime = int64(1598306400)
 var dateFormat = "2006-01-02"
 
 func init() {
+	// 禁用 glog 的标志解析
+	flag.CommandLine = flag.NewFlagSet("", flag.ExitOnError)
 
 	if api := os.Getenv("FULLNODE_API_INFO"); api == "" {
 		err := os.Setenv("FULLNODE_API_INFO", LotusApi)
