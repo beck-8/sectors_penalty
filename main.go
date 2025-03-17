@@ -16,7 +16,6 @@ func main() {
 	r.GET("/penalty", penalty)
 	r.GET("/vested", vestedFunds)
 	r.GET("/dailyfee", getDailyFee)
-	// todo: waiting nv15 code
-	// r.GET("/spdailyfee", getSpDailyFee)
+	r.GET("/spdailyfee", getSpDailyFee)
 	r.Run(port)
 }

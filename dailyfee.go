@@ -7,7 +7,9 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/lotus/api"
+	"github.com/filecoin-project/lotus/chain/actors/builtin/miner"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/gin-gonic/gin"
 	"github.com/olekukonko/tablewriter"
@@ -21,8 +23,8 @@ type dailyFee struct {
 }
 
 type spFee struct {
-	DailyFee string `json:"daily_fee"`
-	SumFee   string `json:"sum_fee"`
+	DailyFee float64 `json:"daily_fee"`
+	TotalFee float64 `json:"total_fee"`
 }
 
 var (
@@ -121,42 +123,119 @@ func CalculateQAPFee(circulatingSupply api.CirculatingSupply, qapBytes *big.Int)
 }
 
 func getSpDailyFee(c *gin.Context) {
-	// miner := c.Query("miner")
-	// if miner == "" {
-	// 	c.JSON(http.StatusBadRequest, APIResponse{
-	// 		Code: http.StatusBadRequest,
-	// 		Msg:  "please specify a miner",
-	// 	})
-	// 	return
-	// }
-	// mid, err := address.NewFromString(miner)
-	// if err != nil {
-	// 	c.JSON(http.StatusBadRequest, APIResponse{
-	// 		Code: http.StatusBadRequest,
-	// 		Msg:  err.Error(),
-	// 	})
-	// 	return
-	// }
+	miner := c.Query("miner")
+	if miner == "" {
+		c.JSON(http.StatusBadRequest, APIResponse{
+			Code: http.StatusBadRequest,
+			Msg:  "please specify a miner",
+		})
+		return
+	}
+	mid, err := address.NewFromString(miner)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, APIResponse{
+			Code: http.StatusBadRequest,
+			Msg:  err.Error(),
+		})
+		return
+	}
 
-	// jsonOut, _ := strconv.ParseBool(c.DefaultQuery("json", "0"))
+	jsonOut, _ := strconv.ParseBool(c.DefaultQuery("json", "0"))
 
-	// data, err := computeDailyFee(mid, jsonOut)
-	// if err != nil {
-	// 	c.JSON(http.StatusInternalServerError, APIResponse{
-	// 		Code: http.StatusInternalServerError,
-	// 		Msg:  err.Error(),
-	// 	})
-	// 	return
-	// }
+	data, err := computeSpDailyFee(mid, jsonOut)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, APIResponse{
+			Code: http.StatusInternalServerError,
+			Msg:  err.Error(),
+		})
+		return
+	}
 
-	// if jsonOut {
-	// 	c.JSON(http.StatusOK, APIResponse{
-	// 		Code: http.StatusOK,
-	// 		Msg:  "OK",
-	// 		Data: data,
-	// 	})
-	// } else {
-	// 	c.String(200, data.(string))
-	// }
+	if jsonOut {
+		c.JSON(http.StatusOK, APIResponse{
+			Code: http.StatusOK,
+			Msg:  "OK",
+			Data: data,
+		})
+	} else {
+		c.String(200, data.(string))
+	}
+
+}
+
+func computeSpDailyFee(mid address.Address, jsonOut bool) (interface{}, error) {
+	d := spFee{}
+
+	tsk, err := lapi.ChainHead(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	deadlines, err := lapi.StateMinerDeadlines(ctx, mid, types.EmptyTSK)
+	if err != nil {
+		return "", err
+	}
+	for _, deadline := range deadlines {
+		if deadline.DailyFee.NilOrZero() {
+			continue
+		}
+		fee, _ := new(big.Rat).Quo(new(big.Rat).SetInt(deadline.DailyFee.Int), new(big.Rat).SetInt(big.NewInt(1e18))).Float64()
+		d.DailyFee += fee
+	}
+
+	liveSectors := make(map[uint64]bool)
+	for i := 0; i < 48; i++ {
+		partitions, err := lapi.StateMinerPartitions(ctx, mid, uint64(i), types.EmptyTSK)
+		if err != nil {
+			return "", err
+		}
+		for _, part := range partitions {
+			liveCount, err := part.LiveSectors.Count()
+			if err != nil {
+				return "", err
+			}
+			liveSector, err := part.LiveSectors.AllMap(liveCount)
+			if err != nil {
+				return "", err
+			}
+			for k, v := range liveSector {
+				liveSectors[k] = v
+			}
+		}
+	}
+	var onChainInfo []*miner.SectorOnChainInfo
+	tmp, err := lapi.StateMinerSectors(ctx, mid, nil, types.EmptyTSK)
+	if err != nil {
+		return "", err
+	}
+	for _, v := range tmp {
+		if liveSectors[uint64(v.SectorNumber)] {
+			onChainInfo = append(onChainInfo, v)
+		}
+	}
+
+	for _, info := range onChainInfo {
+		if info.DailyFee.NilOrZero() {
+			continue
+		}
+		// 简单计算，实际会有一天内的误差
+		// Simple calculation, there will actually be an error of one day
+		days := (float64(info.Expiration) - float64(tsk.Height())) / 2880
+		fee, _ := new(big.Rat).SetInt64(0).Quo(new(big.Rat).SetInt(info.DailyFee.Int), new(big.Rat).SetInt(big.NewInt(1e18))).Float64()
+		d.TotalFee += days * fee
+	}
+	if jsonOut {
+		return d, nil
+	}
+	buf := new(bytes.Buffer)
+	buf.WriteString(fmt.Sprintf("Chain Height: %d\n", tsk.Height()))
+	buf.WriteString(fmt.Sprintf("Chain Timestamp: %d\n", tsk.MinTimestamp()))
+	buf.WriteString(fmt.Sprintf("Miner: %s\n", mid.String()))
+	buf.WriteString(fmt.Sprintf("Sectors: %d\n", len(onChainInfo)))
+	buf.WriteString(fmt.Sprintf("Daily Fee: %.12f FIL\n", d.DailyFee))
+	buf.WriteString(fmt.Sprintf("Total Fee: %.12f FIL\n", d.TotalFee))
+	buf.WriteString("Ps: Daily Fee * day != Total Fee, because the expiration time of the sector is different")
+
+	return buf.String(), nil
 
 }
