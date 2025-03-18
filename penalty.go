@@ -216,7 +216,7 @@ func Compute(mid address.Address, allSectors bool, offset abi.ChainEpoch, jsonOu
 			}
 		} else {
 
-			penalty = PledgePenaltyForTermination(info.InitialPledge, int64(tsk.Height()+offset-info.PowerBaseEpoch), FaultFee(minerInfo.SectorSize, info, rewardEstimate, networkQAPowerEstimate))
+			penalty = PledgePenaltyForTermination(info.InitialPledge, int64(tsk.Height()+offset-info.Activation), FaultFee(minerInfo.SectorSize, info, rewardEstimate, networkQAPowerEstimate))
 		}
 
 		if data, ok := sumData[date]; ok {
