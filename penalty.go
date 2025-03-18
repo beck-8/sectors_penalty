@@ -12,10 +12,33 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
-	m "github.com/filecoin-project/go-state-types/builtin/v15/miner"
+	m "github.com/filecoin-project/go-state-types/builtin/v16/miner"
+	s "github.com/filecoin-project/go-state-types/builtin/v16/util/smoothing"
+	gststore "github.com/filecoin-project/go-state-types/store"
+	"github.com/filecoin-project/lotus/blockstore"
+	"github.com/filecoin-project/lotus/chain/actors/builtin"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/miner"
+	"github.com/filecoin-project/lotus/chain/actors/builtin/power"
+	"github.com/filecoin-project/lotus/chain/actors/builtin/reward"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/gin-gonic/gin"
+)
+
+// https://github.com/filecoin-project/FIPs/blob/master/FIPS/fip-0098.md#specification
+var (
+	TERMINATION_LIFETIME_CAP = int64(140)
+
+	TERM_FEE_PLEDGE_MULTIPLE_NUM   = big.NewInt(85)
+	TERM_FEE_PLEDGE_MULTIPLE_DENOM = big.NewInt(1000)
+
+	TERM_FEE_MIN_PLEDGE_MULTIPLE_NUM   = big.NewInt(2)
+	TERM_FEE_MIN_PLEDGE_MULTIPLE_DENOM = big.NewInt(100)
+
+	TERM_FEE_MAX_FAULT_FEE_MULTIPLE_NUM   = big.NewInt(105)
+	TERM_FEE_MAX_FAULT_FEE_MULTIPLE_DENOM = big.NewInt(100)
+
+	// todo: 高度未确定
+	nv25Height = abi.ChainEpoch(4863600)
 )
 
 type APIResponse struct {
@@ -146,6 +169,11 @@ func Compute(mid address.Address, allSectors bool, offset abi.ChainEpoch, jsonOu
 		}
 	}
 
+	rewardEstimate, networkQAPowerEstimate, err := GetSmoothing(tsk)
+	if err != nil {
+		return "", err
+	}
+
 	sumData := make(map[string]*dailyData, 540)
 	for _, info := range onChainInfo {
 		// date := heightToTime(int64(info.Expiration) + int64(deadlines[uint64(info.SectorNumber)]*60))
@@ -154,36 +182,41 @@ func Compute(mid address.Address, allSectors bool, offset abi.ChainEpoch, jsonOu
 
 		var penalty abi.TokenAmount
 
-		// https://github.com/filecoin-project/builtin-actors/blob/54236ae89880bf4aa89b0dba6d9060c3fd2aacee/actors/miner/src/monies.rs#L202
-		// ctrl c ctrl v 的，所以没有遵循golang的命名规范
-		lifetime_cap := int64(140 * 2880)
-		var capped_sector_age int64
-		if sector_age := int64(tsk.Height()+offset) - int64(info.PowerBaseEpoch); lifetime_cap < sector_age {
-			capped_sector_age = lifetime_cap
+		if tsk.Height() < nv25Height {
+			// https://github.com/filecoin-project/builtin-actors/blob/54236ae89880bf4aa89b0dba6d9060c3fd2aacee/actors/miner/src/monies.rs#L202
+			// ctrl c ctrl v 的，所以没有遵循golang的命名规范
+			lifetime_cap := int64(140 * 2880)
+			var capped_sector_age int64
+			if sector_age := int64(tsk.Height()+offset) - int64(info.PowerBaseEpoch); lifetime_cap < sector_age {
+				capped_sector_age = lifetime_cap
+			} else {
+				capped_sector_age = sector_age
+			}
+			if capped_sector_age < 0 {
+				capped_sector_age = 0
+			}
+			expected_reward := big.Mul(info.ExpectedDayReward, big.NewInt(capped_sector_age))
+
+			var relevant_replaced_age int64
+			if replaced_sector_age := int64(info.PowerBaseEpoch) - int64(info.Activation); replaced_sector_age < lifetime_cap-capped_sector_age {
+				relevant_replaced_age = replaced_sector_age
+			} else {
+				relevant_replaced_age = lifetime_cap - capped_sector_age
+			}
+			expected_reward = big.Add(expected_reward, big.Mul(info.ReplacedDayReward, big.NewInt(relevant_replaced_age)))
+			expected_reward = big.Div(expected_reward, big.NewInt(2))
+
+			penalty = big.Add(info.ExpectedStoragePledge, big.Div(expected_reward, big.NewInt(2880)))
+
+			// 说明用户把offset设置了很大的负数，这个时候罚金就是ExpectedStoragePledge
+			// 这样处理后，t = tsk.Height()+offset，t在上次续期时间之后是准确的；t在扇区激活-上次续期时间之间是不太准确的；t在扇区激活之前是准确的。
+			// |----|--bad--|----|
+			if tsk.Height()+offset < info.Activation {
+				penalty = info.ExpectedStoragePledge
+			}
 		} else {
-			capped_sector_age = sector_age
-		}
-		if capped_sector_age < 0 {
-			capped_sector_age = 0
-		}
-		expected_reward := big.Mul(info.ExpectedDayReward, big.NewInt(capped_sector_age))
 
-		var relevant_replaced_age int64
-		if replaced_sector_age := int64(info.PowerBaseEpoch) - int64(info.Activation); replaced_sector_age < lifetime_cap-capped_sector_age {
-			relevant_replaced_age = replaced_sector_age
-		} else {
-			relevant_replaced_age = lifetime_cap - capped_sector_age
-		}
-		expected_reward = big.Add(expected_reward, big.Mul(info.ReplacedDayReward, big.NewInt(relevant_replaced_age)))
-		expected_reward = big.Div(expected_reward, big.NewInt(2))
-
-		penalty = big.Add(info.ExpectedStoragePledge, big.Div(expected_reward, big.NewInt(2880)))
-
-		// 说明用户把offset设置了很大的负数，这个时候罚金就是ExpectedStoragePledge
-		// 这样处理后，t = tsk.Height()+offset，t在上次续期时间之后是准确的；t在扇区激活-上次续期时间之间是不太准确的；t在扇区激活之前是准确的。
-		// |----|--bad--|----|
-		if tsk.Height()+offset < info.Activation {
-			penalty = info.ExpectedStoragePledge
+			penalty = PledgePenaltyForTermination(info.InitialPledge, int64(tsk.Height()+offset-info.PowerBaseEpoch), FaultFee(minerInfo.SectorSize, info, rewardEstimate, networkQAPowerEstimate))
 		}
 
 		if data, ok := sumData[date]; ok {
@@ -264,4 +297,72 @@ func heightToTime(height int64) string {
 	// 将日期转换为指定格式的字符串
 	dateString := dateTime.Format(dateFormat)
 	return dateString
+}
+
+// copy from builtin-actors
+func PledgePenaltyForTermination(initial_pledge abi.TokenAmount, sector_age int64, fault_fee abi.TokenAmount) abi.TokenAmount {
+	simple_termination_fee := big.Div(big.Mul(initial_pledge, TERM_FEE_PLEDGE_MULTIPLE_NUM), TERM_FEE_PLEDGE_MULTIPLE_DENOM)
+	duration_termination_fee := big.Div(big.Mul(big.NewInt(sector_age), simple_termination_fee), big.NewInt(TERMINATION_LIFETIME_CAP*2880))
+	base_termination_fee := big.Min(simple_termination_fee, duration_termination_fee)
+
+	minimum_fee_abs := big.Div(big.Mul(initial_pledge, TERM_FEE_MIN_PLEDGE_MULTIPLE_NUM), TERM_FEE_MIN_PLEDGE_MULTIPLE_DENOM)
+	minimum_fee_ff := big.Div(big.Mul(fault_fee, TERM_FEE_MAX_FAULT_FEE_MULTIPLE_NUM), TERM_FEE_MAX_FAULT_FEE_MULTIPLE_DENOM)
+	minimum_fee := big.Max(minimum_fee_abs, minimum_fee_ff)
+
+	return big.Max(base_termination_fee, minimum_fee)
+}
+
+// pub const CONTINUED_FAULT_PROJECTION_PERIOD: ChainEpoch = (EPOCHS_IN_DAY * CONTINUED_FAULT_FACTOR_NUM) / CONTINUED_FAULT_FACTOR_DENOM;
+// 3.51 * dayward
+func FaultFee(size abi.SectorSize, info *m.SectorOnChainInfo, rewardEstimate s.FilterEstimate, networkQAPowerEstimate s.FilterEstimate) abi.TokenAmount {
+	qaPower := m.QAPowerForSector(size, info)
+	fee := m.ExpectedRewardForPower(rewardEstimate, networkQAPowerEstimate, qaPower, 10080)
+	return fee
+}
+
+func GetSmoothing(ts *types.TipSet) (s.FilterEstimate, s.FilterEstimate, error) {
+	bs := blockstore.NewAPIBlockstore(lapi)
+	ctxStore := gststore.WrapBlockStore(ctx, bs)
+
+	powerActor, err := lapi.StateGetActor(ctx, power.Address, ts.Key())
+	if err != nil {
+		return s.FilterEstimate{}, s.FilterEstimate{}, err
+	}
+
+	powerState, err := power.Load(ctxStore, powerActor)
+	if err != nil {
+		return s.FilterEstimate{}, s.FilterEstimate{}, err
+	}
+
+	rewardActor, err := lapi.StateGetActor(ctx, reward.Address, ts.Key())
+	if err != nil {
+		return s.FilterEstimate{}, s.FilterEstimate{}, err
+	}
+
+	rewardState, err := reward.Load(ctxStore, rewardActor)
+	if err != nil {
+		return s.FilterEstimate{}, s.FilterEstimate{}, err
+	}
+
+	networkQAPower, err := powerState.TotalPowerSmoothed()
+	if err != nil {
+		return s.FilterEstimate{}, s.FilterEstimate{}, err
+	}
+
+	thisEpochRewardSmoothed, err := rewardState.(interface {
+		ThisEpochRewardSmoothed() (builtin.FilterEstimate, error)
+	}).ThisEpochRewardSmoothed()
+	if err != nil {
+		return s.FilterEstimate{}, s.FilterEstimate{}, err
+	}
+
+	rewardEstimate := s.FilterEstimate{
+		PositionEstimate: thisEpochRewardSmoothed.PositionEstimate,
+		VelocityEstimate: thisEpochRewardSmoothed.VelocityEstimate,
+	}
+	networkQAPowerEstimate := s.FilterEstimate{
+		PositionEstimate: networkQAPower.PositionEstimate,
+		VelocityEstimate: networkQAPower.VelocityEstimate,
+	}
+	return rewardEstimate, networkQAPowerEstimate, nil
 }
