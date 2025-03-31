@@ -15,5 +15,7 @@ func main() {
 	// 使用查询参数解析 URL 参数
 	r.GET("/penalty", penalty)
 	r.GET("/vested", vestedFunds)
+	r.GET("/dailyfee", getDailyFee)
+	r.GET("/spdailyfee", getSpDailyFee)
 	r.Run(port)
 }
