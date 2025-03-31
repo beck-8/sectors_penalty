@@ -37,8 +37,7 @@ var (
 	TERM_FEE_MAX_FAULT_FEE_MULTIPLE_NUM   = big.NewInt(105)
 	TERM_FEE_MAX_FAULT_FEE_MULTIPLE_DENOM = big.NewInt(100)
 
-	// todo: 高度未确定
-	nv25Height = abi.ChainEpoch(4863600)
+	nv25Height = abi.ChainEpoch(4867320)
 )
 
 type APIResponse struct {
@@ -195,7 +194,7 @@ func Compute(mid address.Address, allSectors bool, offset abi.ChainEpoch, jsonOu
 			if capped_sector_age < 0 {
 				capped_sector_age = 0
 			}
-			expected_reward := big.Mul(info.ExpectedDayReward, big.NewInt(capped_sector_age))
+			expected_reward := big.Mul(*info.ExpectedDayReward, big.NewInt(capped_sector_age))
 
 			var relevant_replaced_age int64
 			if replaced_sector_age := int64(info.PowerBaseEpoch) - int64(info.Activation); replaced_sector_age < lifetime_cap-capped_sector_age {
@@ -203,16 +202,16 @@ func Compute(mid address.Address, allSectors bool, offset abi.ChainEpoch, jsonOu
 			} else {
 				relevant_replaced_age = lifetime_cap - capped_sector_age
 			}
-			expected_reward = big.Add(expected_reward, big.Mul(info.ReplacedDayReward, big.NewInt(relevant_replaced_age)))
+			expected_reward = big.Add(expected_reward, big.Mul(*info.ReplacedDayReward, big.NewInt(relevant_replaced_age)))
 			expected_reward = big.Div(expected_reward, big.NewInt(2))
 
-			penalty = big.Add(info.ExpectedStoragePledge, big.Div(expected_reward, big.NewInt(2880)))
+			penalty = big.Add(*info.ExpectedStoragePledge, big.Div(expected_reward, big.NewInt(2880)))
 
 			// 说明用户把offset设置了很大的负数，这个时候罚金就是ExpectedStoragePledge
 			// 这样处理后，t = tsk.Height()+offset，t在上次续期时间之后是准确的；t在扇区激活-上次续期时间之间是不太准确的；t在扇区激活之前是准确的。
 			// |----|--bad--|----|
 			if tsk.Height()+offset < info.Activation {
-				penalty = info.ExpectedStoragePledge
+				penalty = *info.ExpectedStoragePledge
 			}
 		} else {
 
