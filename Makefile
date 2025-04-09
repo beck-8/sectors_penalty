@@ -12,7 +12,7 @@ all: deps build
 
 # 构建二进制文件
 build:
-	$(GOCC) build -ldflags "-s -w" -o $(PACKAGE_NAME)
+	$(GOCC) build -ldflags "-X 'main.CurrentCommit=`git show -s --format=%H|cut -b 1-10`'" -o $(PACKAGE_NAME)
 
 # 安装依赖
 deps:
