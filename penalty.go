@@ -37,7 +37,7 @@ var (
 	TERM_FEE_MAX_FAULT_FEE_MULTIPLE_NUM   = big.NewInt(105)
 	TERM_FEE_MAX_FAULT_FEE_MULTIPLE_DENOM = big.NewInt(100)
 
-	nv25Height = abi.ChainEpoch(4867320)
+	nv25Height = abi.ChainEpoch(4878840)
 )
 
 type APIResponse struct {
