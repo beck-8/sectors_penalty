@@ -1,6 +1,9 @@
 # sectors_penalty
+## Features
 - 获取节点扇区过期时间、过期扇区数量、到期释放质押币、此时终结惩罚（扇区在请求数据时进行终结，要惩罚的费用）
 - 获取节点的锁仓释放明细
+- 获取当前网络的dayfee
+- 获取指定SP的dayfee情况
 ## install && run
 > 返回慢时，优化此程序到lotus rpc之间的链接
 ```bash
