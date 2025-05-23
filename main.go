@@ -27,5 +27,6 @@ func main() {
 	r.GET("/vested", vestedFunds)
 	r.GET("/dailyfee", getDailyFee)
 	r.GET("/spdailyfee", getSpDailyFee)
+	r.GET("/faultfee", faultFee)
 	r.Run(port)
 }

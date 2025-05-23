@@ -315,7 +315,7 @@ func PledgePenaltyForTermination(initial_pledge abi.TokenAmount, sector_age int6
 // 3.51 * dayward
 func FaultFee(size abi.SectorSize, info *m.SectorOnChainInfo, rewardEstimate s.FilterEstimate, networkQAPowerEstimate s.FilterEstimate) abi.TokenAmount {
 	qaPower := m.QAPowerForSector(size, info)
-	fee := m.ExpectedRewardForPower(rewardEstimate, networkQAPowerEstimate, qaPower, 10080)
+	fee := m.ExpectedRewardForPower(rewardEstimate, networkQAPowerEstimate, qaPower, 10108)
 	return fee
 }
 
