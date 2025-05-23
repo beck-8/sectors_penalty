@@ -4,6 +4,7 @@
 - 获取节点的锁仓释放明细
 - 获取当前网络的dayfee
 - 获取指定SP的dayfee情况
+- 获取32G扇区的faultfee
 ## install && run
 > 返回慢时，优化此程序到lotus rpc之间的链接
 ```bash
