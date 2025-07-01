@@ -1,13 +1,13 @@
 # sectors_penalty
 [English](README.md) | [中文](README_CN.md)
 ## Features
-- Retrieve node sector expiration times, number of expired sectors, pledge release upon expiration, and termination penalties (penalties if sectors are terminated at query time)
-- Get detailed vesting schedule for node locked funds
-- Get current network daily fee
-- Get daily fee information for specific SPs
-- Get fault fee for 32G sectors
+- 获取节点扇区过期时间、过期扇区数量、到期释放质押币、此时终结惩罚（扇区在请求数据时进行终结，要惩罚的费用）
+- 获取节点的锁仓释放明细
+- 获取当前网络的dayfee
+- 获取指定SP的dayfee情况
+- 获取32G扇区的faultfee
 ## install && run
-> When response is slow, optimize the connection between this program and lotus RPC
+> 返回慢时，优化此程序到lotus rpc之间的链接
 ```bash
 git clone https://github.com/beck-8/sectors_penalty.git
 make
@@ -23,31 +23,31 @@ make
 export FULLNODE_API_INFO=/ip4/192.168.1.1/tcp/1234/http
 ./sectors_penalty
 
-# use custom date format
-# digits must match exactly, this is the standard
+# 使用自定义的日期格式
+# 数字必须一摸一样，这是规范
 export DATE_FORMAT="2006-01-02"
 export DATE_FORMAT="2006-01-02 15:04:05"
 ```
 ## Usage
-> miner: minerid  
-all: whether to show all sectors (including expired ones)
-offset: how many days to shift forward/backward (+20/-20)
-json: return data in JSON format
-#### View f01155 information  
+> miner 节点ID  
+all 是否展示全部的扇区（包含过期的）  
+offset 往前/往后推移多少天（+20/-20）  
+json 返回json格式数据
+#### 查看f01155的信息  
 ```
 http://127.0.0.1:8099/penalty?miner=f01155
 
 http://127.0.0.1:8099/penalty?miner=f01155&json=1
 ```
-#### View all f01155 information (including expired sectors)
+#### 查看f01155全部的信息（包含已经过期的）
 ```
 http://127.0.0.1:8099/penalty?miner=f01155&all=1
 ```
-#### View f01155 termination penalty information 20 days later (unchanged penalty column indicates maximum penalty has been reached)
+#### 查看f01155 20天后的终结惩罚信息（penalty列数据不变说明已经达到惩罚上限）
 ```
 http://127.0.0.1:8099/penalty?miner=f01155&offset=20
 ```
-#### View f01155 vesting schedule details
+#### 查看f01155 锁仓释放明细
 ```
 http://127.0.0.1:8099/vested?miner=f01155
 
@@ -55,7 +55,7 @@ http://127.0.0.1:8099/vested?miner=f01155&json=1
 ```
 
 ## example
->  You can use curl command or open in a browser 
+>  使用curl命令或者浏览器打开都可以  
 
 `curl http://127.0.0.1:8099/penalty?miner=f0866680`
 
@@ -92,11 +92,11 @@ date,mid,sectors_sum,power(TiB),pledge,penalty
 2025-01-02,f0866680,174,5.4375,343.7625333907,8.5634895705
 ,,5073,158.53125,10164.2017759800,357.7080707281
 ```
-- The first row is the header, the last row is the data summary, and the last column is the estimated sector penalty data
-- To view previously expired data, use curl http://127.0.0.1:8099/penalty?miner=f0866680&all=1
-- To see the penalty if all sectors are terminated 20 days later, use curl http://127.0.0.1:8099/penalty?miner=f0866680&offset=20
-- To see the penalty if all sectors were terminated 20 days ago, use curl http://127.0.0.1:8099/penalty?miner=f0866680&offset=-20
-- For secondary data processing, copy the data and save as CSV, open in Excel with comma delimiter, or use tools like awk
+- 第一行是标题，最后一行是数据汇总，最后一列是扇区惩罚的预估数据
+- 如果想看之前已经过期的数据，使用 `curl http://127.0.0.1:8099/penalty?miner=f0866680&all=1`
+- 如果想看此节点20天之后全部终结的惩罚，使用 `curl http://127.0.0.1:8099/penalty?miner=f0866680&offset=20`
+- 如果想看此节点20天之前全部终结的惩罚，使用 `curl http://127.0.0.1:8099/penalty?miner=f0866680&offset=-20`
+- 如果要对数据进行二次处理加工，复制数据保存为csv打开或者使用excel按逗号分列或者awk等等
 
 `curl http://127.0.0.1:8099/vested?miner=f0866680`
 ```
